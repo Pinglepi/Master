@@ -1,5 +1,6 @@
 from keras.models import Sequential
 from keras.layers import Dense, Flatten, Input, Conv1D, BatchNormalization, ReLU, GlobalAveragePooling1D, Dropout, MaxPooling1D, AveragePooling1D
+from keras.optimizers import Adam
 from keras.regularizers import l2
 import xgboost as xgb
 from TF_models import *
@@ -19,7 +20,7 @@ def Create_DNN(X_train, y_train, X_val, y_val):
     model.add(Dense(1, activation='sigmoid'))
     
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-    early_stopping = EarlyStopping(patience=3, restore_best_weights=True)
+    early_stopping = EarlyStopping(patience=15, restore_best_weights=True)
     model.fit(X_train, y_train, epochs=100, batch_size=256, validation_data=(X_val, y_val), callbacks=[early_stopping])
     
     return model
@@ -32,7 +33,7 @@ def Create_CNN_simple(X_train, y_train, X_val, y_val):
     model.add(Dense(1, activation='sigmoid'))
 
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-    early_stopping = EarlyStopping(patience=3, restore_best_weights=True)
+    early_stopping = EarlyStopping(patience=15, restore_best_weights=True)
     model.fit(X_train, y_train, epochs=100, batch_size=256, validation_data=(X_val, y_val), callbacks=[early_stopping])
     
     return model
@@ -40,69 +41,56 @@ def Create_CNN_simple(X_train, y_train, X_val, y_val):
 def Create_CNN_super(X_train, y_train, X_val, y_val):
     model = Sequential()
     
-    # Module 1
-    model.add(Conv1D(filters=64, kernel_size=5, input_shape=(X_train.shape[1], 20)))
-    model.add(ReLU())
+    # Convolutional layer with L2 regularization
+    model.add(Conv1D(64, 3, activation='relu', input_shape=(200, 20), kernel_regularizer=l2(0.01)))
     model.add(BatchNormalization())
-    #model.add(Dropout(0.2))  # Adding dropout
-    model.add(AveragePooling1D(pool_size=2, padding='same'))
-    
-    # Module 2
-    model.add(Conv1D(filters=128, kernel_size=7, padding='same'))
-    model.add(ReLU())
-    model.add(BatchNormalization())
-    #model.add(Dropout(0.25))  # Adding dropout
-    model.add(AveragePooling1D(pool_size=2, padding='same'))
-    
-    # Module 3
-    model.add(Conv1D(filters=256, kernel_size=9, padding='same'))
-    model.add(ReLU())
-    model.add(BatchNormalization())
-    #model.add(Dropout(0.3))  # Adding dropout
-    model.add(AveragePooling1D())
+    model.add(MaxPooling1D(2))
 
-    # Module 3
-    model.add(Conv1D(filters=512, kernel_size=11, padding='same'))
-    model.add(ReLU())
+    # Second convolutional layer
+    model.add(Conv1D(128, 3, activation='relu', kernel_regularizer=l2(0.01)))
     model.add(BatchNormalization())
-    #model.add(Dropout(0.3))  # Adding dropout
-    model.add(GlobalAveragePooling1D())
+    model.add(MaxPooling1D(2))
 
-    model.add(Dense(64, activation='relu', kernel_regularizer=l2(0.01)))
-    model.add(Dropout(0.5))
+    # Third convolutional layer
+    model.add(Conv1D(256, 3, activation='relu', kernel_regularizer=l2(0.01)))
+    model.add(BatchNormalization())
+    model.add(MaxPooling1D(2))
+
+    # Flatten and Dense layers with dropout and L2 regularization
+    model.add(Flatten())
+    model.add(Dense(256, activation='relu', kernel_regularizer=l2(0.01)))
+    model.add(Dropout(0.5))  # Increased dropout to prevent overfitting
     model.add(Dense(1, activation='sigmoid'))
 
+    # Compile the model with learning_rate instead of lr
+    model.compile(optimizer=Adam(learning_rate=0.0001), loss='binary_crossentropy', metrics=['accuracy'])
 
-    # Compile the model
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-
-    early_stopping = EarlyStopping(patience=5, restore_best_weights=True)
+    early_stopping = EarlyStopping(patience=15, restore_best_weights=True)
     model.fit(X_train, y_train, epochs=100, batch_size=256, validation_data=(X_val, y_val), callbacks=[early_stopping])
     
     return model
 
 def Create_XGBoost(X_train, y_train, X_val, y_val):
+    # Reshape data to 2D
     X_train = X_train.reshape(X_train.shape[0], -1)
     X_val = X_val.reshape(X_val.shape[0], -1)
+    
+    # Create DMatrix objects for XGBoost
     dtrain = xgb.DMatrix(X_train, label=y_train)
     dtest = xgb.DMatrix(X_val, label=y_val)
-
-    params = {
-        'max_depth': 6,  # Maximum depth of a tree. Increasing this value will make the model more complex and more likely to overfit.
-        'eta': 0.3,  # The learning rate. Prevents overfitting.
-        'objective': 'binary:logistic',  
-        'eval_metric': 'logloss',  
-        'nthread': 4,  
-        'seed': 42,  # Random seed for reproducibility
-        'tree_method': 'hist',
-        'device':'cuda'
-    }
-
+    
     # Specify the number of training rounds
     num_boost_round = 1000
 
-    # Train the model
-    model = xgb.train(params, dtrain, num_boost_round, evals=[(dtest, 'test')], early_stopping_rounds=10)
+    # Train the model with early stopping
+    model = xgb.train(
+        {'eval_metric': 'logloss'},  # Set the evaluation metric for validation
+        dtrain, 
+        num_boost_round, 
+        evals=[(dtest, 'test')], 
+        early_stopping_rounds=15
+    )
+
     return model
 
 def batch_generator(data, targets, batch_size, shuffle=True):
