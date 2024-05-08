@@ -37,7 +37,7 @@ if __name__ == "__main__":
     data_neg_full = data[data["has_hmm"] == 0]
 
     # Check the number of positives and adjust if necessary
-    data_length = 250000 # change this when adjusting the number of samples
+    data_length = 100000 # change this when adjusting the number of samples
     if len(data_pos_full) >= data_length:
         data_pos = data_pos_full.sample(n=data_length, random_state=1)
     else:

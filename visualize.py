@@ -15,7 +15,7 @@ def load_data():
     base_dir_2 = 'Exports'
 
     # List all species directories
-    dataset_list = ["General", "Bacillales", "Corynebacteriales", "Burkholderiales", "Lactobacillales", "Enterobacterales", "Pfam_1", "Pfam_2", "Pfam_3", "Pfam_4", "Pfam_5"]
+    dataset_list = ["General", "Bacillales", "Corynebacteriales", "Burkholderiales", "Lactobacillales", "Enterobacterales", "Pfam_1", "Pfam_2", "Pfam_3", "Pfam_4", "Pfam_5", 'Pfam_1-20']
 
     # Prepare a list to hold all DataFrames
     all_data_predictions = []
@@ -54,6 +54,9 @@ def load_data():
     return combined_df_predictions, combined_df_performance
 
 def plot_roc_curve(df_predictions, model_name, dataset):
+
+    sns.set(font_scale=2)
+
     # Filter the DataFrame for the specified model and dataset
     model_df = df_predictions[(df_predictions['Model'] == model_name) & (df_predictions['dataset'] == dataset)]
 
@@ -77,15 +80,14 @@ def plot_roc_curve(df_predictions, model_name, dataset):
     plt.legend(loc="lower right")
 
     # Save the plot before showing it in the folder Exports/images under the name of the model and dataset
-    plt.savefig(f'Exports/Images/{model_name}_{dataset}_roc_curve.png')
-
-    # Now display the plot
-    plt.show()
+    plt.savefig(f'Exports/Images/Roc/{model_name}_{dataset}_roc_curve.png')
 
     return None
 
 def plot_confustion_matrix(df_predictions, model_name, dataset):
     
+    sns.set(font_scale=2)
+
     # Filter the DataFrame for the specified model and dataset
     model_df = df_predictions[(df_predictions['Model'] == model_name) & (df_predictions['dataset'] == dataset)]
 
@@ -103,18 +105,21 @@ def plot_confustion_matrix(df_predictions, model_name, dataset):
     plt.title(f'Confusion Matrix for {model_name} on {dataset}')
     
     # Save the plot before showing it in the folder Exports/images under the name of the model and dataset
-    plt.savefig(f'Exports/Images/{model_name}_{dataset}_confusion_matrix.png')
-
-    # Now display the plot
-    plt.show()
+    plt.savefig(f'Exports/Images/Matrix/{model_name}_{dataset}_confusion_matrix.png')
 
     return None
 
 def plot_distribution_probability(df_predictions, model_name, dataset):
+    
+    sns.set(font_scale=2)
+
     model_df = df_predictions[(df_predictions['Model'] == model_name) & (df_predictions['dataset'] == dataset)]
     # remake them with 10 bins instead
     bins = np.linspace(0, 1, 11)
     labels = [f'{i}-{i+10}%' for i in range(0, 100, 10)]
+
+    # make the labels the middle instead of range
+    labels = [f'{i+5}%' for i in range(0, 100, 10)]
 
     # Assign bins to predicted probabilities
     model_df['Bin'] = pd.cut(model_df['Predicted_Probabilities'], bins=bins, labels=labels, include_lowest=True)
@@ -128,11 +133,11 @@ def plot_distribution_probability(df_predictions, model_name, dataset):
     count_per_bin = model_df['Bin'].value_counts().sort_index()
 
     # Plotting the results
-    fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(14, 10))
+    fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(14, 10))
 
     # Accuracy plot
     axes[0].bar(accuracy_per_bin.index.astype(str), accuracy_per_bin.values, color='skyblue')
-    axes[0].set_title(f'Accuracy per Predicted Probability Bin for {model_name} on {dataset}')
+    axes[0].set_title(f'Accuracy for {model_name} on {dataset}')
     axes[0].set_xlabel('Predicted Probability Bins')
     axes[0].set_ylabel('Accuracy')
     # limit the y-axis to 0.5 to 1
@@ -140,31 +145,26 @@ def plot_distribution_probability(df_predictions, model_name, dataset):
 
     # Count plot
     axes[1].bar(count_per_bin.index.astype(str), count_per_bin.values, color='lightgreen')
-    axes[1].set_title(f'Count per Predicted Probability Bin for {model_name} on {dataset}')
+    axes[1].set_title(f'Count for {model_name} on {dataset}')
     axes[1].set_xlabel('Predicted Probability Bins')
     axes[1].set_ylabel('Count')
-
-    # True plot
-    # Calculate the sum of true values for each bin
-    proportion_per_bin = model_df.groupby('Bin').apply(lambda x: x['True_Labels'].sum() / len(x))
-    # Sum plot
-    axes[2].bar(proportion_per_bin.index.astype(str), proportion_per_bin.values, color='salmon')
-    axes[2].set_xlabel('Predicted Probability Bins')
-    axes[2].set_ylabel('Proportion of True Labels')
-    axes[2].set_title(f'Proportion of True Labels per Predicted Probability Bin for {model_name} on {dataset}')
 
 
     plt.tight_layout()
     # save the plot
-    plt.savefig(f'Exports/Images/{model_name}_{dataset}_distribution_probability.png')
-    plt.show()
+    plt.savefig(f'Exports/Images/Dist/{model_name}_{dataset}_distribution_probability.png')
     return None
 
 if __name__ == '__main__':
     # Load data
     df_predictions, df_performance = load_data()
 
-    # Plot ROC curve for a specific model and dataset
-    plot_roc_curve(df_predictions, 'TM', 'Pfam_5')
-    plot_confustion_matrix(df_predictions, 'TM', 'Pfam_5')
-    plot_distribution_probability(df_predictions, 'TM', 'Pfam_5')
+    models = ['CNN_super', 'TM', 'XGBoost', 'DNN', 'TM_conv', 'CNN_simple']
+    datasets = ['Corynebacteriales', 'Lactobacillales', 'General', 'Pfam_1', 'Pfam_1-20']
+
+    for dataset in datasets:
+        for model in models:
+            plot_roc_curve(df_predictions, model, dataset)
+            plot_confustion_matrix(df_predictions, model, dataset)
+            plot_distribution_probability(df_predictions, model, dataset)
+9
