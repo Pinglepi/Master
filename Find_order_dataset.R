@@ -3,7 +3,7 @@ library(microseq)
 library(micropan)
 
 
-load("representative.tbl.RData")
+load("Data/representative.tbl.RData")
 
 most_common_orders <- representative.tbl %>%
   group_by(order) %>%
